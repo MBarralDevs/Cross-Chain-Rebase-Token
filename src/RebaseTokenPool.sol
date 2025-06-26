@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {TokenPool} from "@chainlink/src/v0.8/ccip/pools/TokenPool.sol";
-import {Pool} from "@chainlink/src/v0.8/ccip/libraries/Pool.sol";
-import {IERC20} from "@chainlink/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {TokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/TokenPool.sol";
+import {Pool} from "@chainlink/contracts/src/v0.8/ccip/libraries/Pool.sol";
+import {IERC20} from
+    "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IRebaseToken} from "./interfaces/IRebaseToken.sol";
 
 contract RebaseTokenPool is TokenPool {
@@ -51,6 +52,8 @@ contract RebaseTokenPool is TokenPool {
         uint256 userInterestRate = abi.decode(releaseOrMintIn.sourcePoolData, (uint256));
 
         //3 - We mint the user's tokens on the destination chain
-        IRebaseToken(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+        IRebaseToken(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount, userInterestRate);
+
+        return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
     }
 }

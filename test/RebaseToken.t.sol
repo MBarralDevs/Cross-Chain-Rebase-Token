@@ -209,9 +209,11 @@ contract RebaseTokenTest is Test {
 
     //Testting that we cant mint if our user doesn't have the mint role
     function testCannotMint() public {
-        vm.prank(user);
+        vm.startPrank(user);
+        uint256 interestRate = rebaseToken.getInterestRate();
         vm.expectRevert();
-        rebaseToken.mint(user, SEND_VALUE);
+        rebaseToken.mint(user, SEND_VALUE, interestRate);
+        vm.stopPrank();
     }
 
     //Testing that we cannot burn if our user doesn't have the burn role
