@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {RebaseToken} from "../src/RebaseToken.sol";
 import {IRebaseToken} from "../src/interfaces/IRebaseToken.sol";
+import {TokenPool} from "@ccip/contracts/src/v0.8/ccip/pools/TokenPool.sol";
 import {Vault} from "../src/Vault.sol";
 import {RebaseTokenPool} from "../src/RebaseTokenPool.sol";
 import {CCIPLocalSimulatorFork} from "@chainlink/local/src/ccip/CCIPLocalSimulatorFork.sol";
@@ -108,6 +109,32 @@ contract CrossChainTest is Test {
         //c. Link token to pool in the token admin registry on Sepolia
         tokenAdminRegistryArbSepolia.setPool(address(arbSepoliaToken), address(arbSepoliaPool));
 
+        vm.stopPrank();
+    }
+
+    function configureTokenPool(
+        uint256 fork,
+        address localPool,
+        uint64 remainChainSelector,
+        address remotePool,
+        address remoteTokenAddress
+    ) public {
+        vm.selectFork(fork);
+        vm.startPrank(owner);
+
+        bytes[] memory remotePoolAddresses = new bytes[](1);
+        remotePoolAddresses[0] = abi.encode(remotePool);
+        TokenPool.ChainUpdate[] memory chainsToAdd = new TokenPool.ChainUpdate[](1);
+
+        chainsToAdd[0] = TokenPool.ChainUpdate({
+            remoteChainSelector: remainChainSelector,
+            allowed: true,
+            remotePoolAddress: remotePoolAddresses[0],
+            remoteTokenAddress: abi.encode(remoteTokenAddress),
+            outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+            inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
+        });
+        TokenPool(localPool).applyChainUpdates(chainsToAdd);
         vm.stopPrank();
     }
 }
