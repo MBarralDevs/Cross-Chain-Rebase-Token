@@ -7,27 +7,81 @@ import {IRebaseToken} from "../src/interfaces/IRebaseToken.sol";
 import {Vault} from "../src/Vault.sol";
 import {RebaseTokenPool} from "../src/RebaseTokenPool.sol";
 import {CCIPLocalSimulatorFork} from "@chainlink/local/src/ccip/CCIPLocalSimulatorFork.sol";
+import {IERC20} from "@ccip/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {Register} from "@chainlink/local/src/ccip/Register.sol";
+import {RegistryModuleOwnerCustom} from "@ccip/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {TokenAdminRegistry} from "@ccip/contracts/src/v0.8/ccip/tokenAdminRegistry/TokenAdminRegistry.sol";
+import {RateLimiter} from "@ccip/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
 
 contract CrossChainTest is Test {
     //States variables
-    uint256 ethSepolia;
-    uint256 arbSepolia;
+    address owner = makeAddr("owner");
+    uint256 ethSepoliaFork;
+    uint256 arbSepoliaFork;
 
-    CCIPLocalSimulatorFork ccipLocalSimulator;
+    CCIPLocalSimulatorFork ccipLocalSimulatorFork;
+
+    RebaseToken ethSepoliaToken;
+    RebaseToken arbSepoliaToken;
+
+    Vault vault;
+
+    RebaseTokenPool ethSepoliaPool;
+    RebaseTokenPool arbSepoliaPool;
+
+    Register.NetworkDetails ethSepoliaNetworkDetails;
+    Register.NetworkDetails arbSepoliaNetworkDetails;
+
+    RegistryModuleOwnerCustom registryModuleOwnerCustomEthSepolia;
+    RegistryModuleOwnerCustom registryModuleOwnerCustomArbSepolia;
 
     function setUp() public {
         //1 - Setting up our fork on our source chain (ETH Sepolia)
         ethSepoliaFork = vm.createSelectFork("sepolia-eth");
 
-        //2 - Setting up our fork on our destination chain (Arbitrum Sepolia)
+        //a. Setting up our fork on our destination chain (Arbitrum Sepolia)
         arbSepoliaFork = vm.createFork("arb-sepolia");
 
-        //3 - Deploying the CCIP Local Simulator contract
-        ccipLocalSimulator = new CCIPLocalSimulatorFork();
+        //b. Deploying the CCIP Local Simulator contract
+        ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
 
-        // 4. Make the simulator's address persistent across all active forks
-        // This is crucial so both the Sepolia and Arbitrum Sepolia forks
-        // can interact with the *same* instance of the simulator.
-        vm.makePersistent(address(ccipLocalSimulator));
+        //c. Make the simulator's address persistent across all active forks
+        vm.makePersistent(address(ccipLocalSimulatorFork));
+
+        //d. Deploying the RebaseToken contract on the source chain (eth Sepolia)
+        ethSepoliaNetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(block.chainid);
+        vm.startPrank(owner);
+        ethSepoliaToken = new RebaseToken();
+        vault = new Vault(IRebaseToken(address(ethSepoliaToken)));
+        ethSepoliaPool = new RebaseTokenPool(
+            IERC20(address(ethSepoliaToken)),
+            new address[](0), // No allowlist for simplicity
+            ethSepoliaNetworkDetails.rmnProxyAddress,
+            ethSepoliaNetworkDetails.routerAddress
+        );
+
+        //e. Grant mint and burn role to our source token
+        ethSepoliaToken.grantMintAndBurnRole(address(ethSepoliaPool));
+        ethSepoliaToken.grantMintAndBurnRole(address(vault));
+
+        //f. Claim role on Sepolia
+        registryModuleOwnerCustomEthSepolia =
+            RegistryModuleOwnerCustom(ethSepoliaNetworkDetails.registryModuleOwnerCustomAddress);
+        registryModuleOwnerCustomEthSepolia.registerAdminViaOwner(address(ethSepoliaToken));
+        vm.stopPrank();
+
+        //2 - Deploying the RebaseToken contract on the destination chain (Arbitrum Sepolia)
+        vm.selectFork(arbSepoliaFork);
+        vm.startPrank(owner);
+        arbSepoliaNetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(block.chainid);
+        arbSepoliaToken = new RebaseToken();
+        arbSepoliaPool = new RebaseTokenPool(
+            IERC20(address(arbSepoliaToken)), // Using the same token for simplicity
+            new address[](0), // No allowlist for simplicity
+            arbSepoliaNetworkDetails.rmnProxyAddress,
+            arbSepoliaNetworkDetails.routerAddress
+        );
+        arbSepoliaToken.grantMintAndBurnRole(address(arbSepoliaPool));
+        vm.stopPrank();
     }
 }

@@ -42,7 +42,9 @@ contract Vault {
 
         //interactions - transfer the Ether back to the user
         (bool success,) = payable(msg.sender).call{value: _amount}("");
-        require(success, Vault__RedeemFailed());
+        if (!success) {
+            revert Vault__RedeemFailed();
+        }
 
         emit Redeem(msg.sender, _amount);
     }

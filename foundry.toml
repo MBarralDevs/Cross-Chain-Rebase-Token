@@ -6,7 +6,6 @@ rpc_endpoints= {sepolia-eth = "https://eth-sepolia.g.alchemy.com/v2/9aOanwEx_Z-T
 remappings = [
     '@openzeppelin/=lib/openzeppelin-contracts/',
     '@ccip/=lib/ccip/',
-    '@chainlink/=lib/chainlink/',
     '@chainlink/local/=lib/chainlink-local/',
 ]
 
