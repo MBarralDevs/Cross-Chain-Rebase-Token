@@ -35,6 +35,9 @@ contract CrossChainTest is Test {
     RegistryModuleOwnerCustom registryModuleOwnerCustomEthSepolia;
     RegistryModuleOwnerCustom registryModuleOwnerCustomArbSepolia;
 
+    TokenAdminRegistry tokenAdminRegistryEthSepolia;
+    TokenAdminRegistry tokenAdminRegistryArbSepolia;
+
     function setUp() public {
         //1 - Setting up our fork on our source chain (ETH Sepolia)
         ethSepoliaFork = vm.createSelectFork("sepolia-eth");
@@ -68,6 +71,14 @@ contract CrossChainTest is Test {
         registryModuleOwnerCustomEthSepolia =
             RegistryModuleOwnerCustom(ethSepoliaNetworkDetails.registryModuleOwnerCustomAddress);
         registryModuleOwnerCustomEthSepolia.registerAdminViaOwner(address(ethSepoliaToken));
+
+        //g. Accept the role on Sepolia
+        tokenAdminRegistryEthSepolia = TokenAdminRegistry(ethSepoliaNetworkDetails.tokenAdminRegistryAddress);
+        tokenAdminRegistryEthSepolia.acceptAdminRole(address(ethSepoliaToken));
+
+        //h. Link token to pool in the token admin registry on Sepolia
+        tokenAdminRegistryEthSepolia.setPool(address(ethSepoliaToken), address(ethSepoliaPool));
+
         vm.stopPrank();
 
         //2 - Deploying the RebaseToken contract on the destination chain (Arbitrum Sepolia)
@@ -81,7 +92,22 @@ contract CrossChainTest is Test {
             arbSepoliaNetworkDetails.rmnProxyAddress,
             arbSepoliaNetworkDetails.routerAddress
         );
+
+        //a. Grant mint and burn role to our destination token
         arbSepoliaToken.grantMintAndBurnRole(address(arbSepoliaPool));
+
+        //b. Claim role on Arbitrum
+        registryModuleOwnerCustomArbSepolia =
+            RegistryModuleOwnerCustom(arbSepoliaNetworkDetails.registryModuleOwnerCustomAddress);
+        registryModuleOwnerCustomArbSepolia.registerAdminViaOwner(address(arbSepoliaToken));
+
+        //c. Accept the role on Arbitrum
+        tokenAdminRegistryArbSepolia = TokenAdminRegistry(arbSepoliaNetworkDetails.tokenAdminRegistryAddress);
+        tokenAdminRegistryArbSepolia.acceptAdminRole(address(arbSepoliaToken));
+
+        //c. Link token to pool in the token admin registry on Sepolia
+        tokenAdminRegistryArbSepolia.setPool(address(arbSepoliaToken), address(arbSepoliaPool));
+
         vm.stopPrank();
     }
 }
