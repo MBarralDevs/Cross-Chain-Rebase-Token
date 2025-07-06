@@ -142,6 +142,7 @@ contract CrossChainTest is Test {
         vm.stopPrank();
     }
 
+    //Setup function to bridge tokens between two chains
     function bridgeTokens(
         uint256 amountToBridge,
         uint256 localFork,
@@ -164,7 +165,7 @@ contract CrossChainTest is Test {
             data: "",
             tokenAmounts: tokenAmount,
             feeToken: localNetworkDetails.linkAddress,
-            extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 100_000}))
+            extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 500_000}))
         });
         vm.stopPrank();
 
@@ -196,23 +197,27 @@ contract CrossChainTest is Test {
 
         vm.selectFork(remoteFork);
         vm.warp(block.timestamp + 900); // Simulating the time for the message to be processed (15min)
-        console.log("test1");
+        //Getting the user's arbitrum sep token balance before the message is processed
         uint256 remoteBalanceBefore = IERC20(address(remoteToken)).balanceOf(user);
-        console.log("test2");
+
         vm.selectFork(localFork);
+        //Switching the chain to arbSepolia and routing the message
         ccipLocalSimulatorFork.switchChainAndRouteMessage(remoteFork);
-        console.log("test3");
+
+        //Checkin that the user's remote token balance has been updated
         uint256 remoteBalanceAfter = IERC20(address(remoteToken)).balanceOf(user);
-        console.log("test3.1");
         assertEq(remoteBalanceAfter, remoteBalanceBefore + amountToBridge);
-        console.log("test4");
+
+        //Checking that the user's interest rate on the remote token is the same as the local token
         uint256 remoteInterestRate = remoteToken.getUserInterestRate(user);
         assertEq(remoteInterestRate, localInterestRate);
-        console.log("test5");
+
         vm.stopPrank();
     }
 
+    //Test function to bridge tokens between two chains (ETH Sepolia and Arbitrum Sepolia)
     function testBridgeAllTokens() public {
+        //Configuring the token pools for both chains
         configureTokenPool(
             ethSepoliaFork,
             ethSepoliaPool,
@@ -231,10 +236,13 @@ contract CrossChainTest is Test {
         vm.selectFork(ethSepoliaFork);
         vm.deal(user, SEND_VALUE);
         vm.startPrank(user);
+
+        //Depositing some ETH into the vault to get the Sepolia RebaseToken
         Vault(payable(address(vault))).deposit{value: SEND_VALUE}();
-        console.log("balance token : ", IERC20(address(ethSepoliaToken)).balanceOf(user));
         assertEq(IERC20(address(ethSepoliaToken)).balanceOf(user), SEND_VALUE);
         vm.stopPrank();
+
+        //Bridging the tokens from ETH Sepolia to Arbitrum Sepolia
         bridgeTokens(
             SEND_VALUE,
             ethSepoliaFork,
@@ -243,6 +251,20 @@ contract CrossChainTest is Test {
             arbSepoliaNetworkDetails,
             ethSepoliaToken,
             arbSepoliaToken
+        );
+
+        vm.selectFork(arbSepoliaFork);
+        vm.warp(block.timestamp + 900); // Simulating the time for the message to be processed (15min)
+
+        //Bridging the tokens from Arbitrum Sepolia to ETH Sepolia
+        bridgeTokens(
+            SEND_VALUE,
+            arbSepoliaFork,
+            ethSepoliaFork,
+            arbSepoliaNetworkDetails,
+            ethSepoliaNetworkDetails,
+            arbSepoliaToken,
+            ethSepoliaToken
         );
     }
 }
