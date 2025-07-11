@@ -20,12 +20,13 @@ contract ConfigurePoolScript is Script {
     ) public {
         // This script is used to configure the pool for the RebaseToken
         vm.startBroadcast();
+        bytes[] memory remotePoolAddresses = new bytes[](1);
+        remotePoolAddresses[0] = abi.encode(remotePoolAddress);
         // Configure the pool with the provided parameters
         TokenPool.ChainUpdate[] memory chainsToAdd = new TokenPool.ChainUpdate[](1);
         chainsToAdd[0] = TokenPool.ChainUpdate({
             remoteChainSelector: remoteChainSelector,
-            allowed: true,
-            remotePoolAddress: abi.encode(remotePoolAddress),
+            remotePoolAddresses: remotePoolAddresses,
             remoteTokenAddress: abi.encode(remoteTokenAddress),
             outboundRateLimiterConfig: RateLimiter.Config({
                 isEnabled: outboundRateLimiterIsEnabled,
@@ -40,7 +41,7 @@ contract ConfigurePoolScript is Script {
         });
 
         //Setting the permissions for the selected chains
-        TokenPool(localPool).applyChainUpdates(chainsToAdd);
+        TokenPool(localPool).applyChainUpdates(new uint64[](0), chainsToAdd);
 
         vm.stopBroadcast();
     }

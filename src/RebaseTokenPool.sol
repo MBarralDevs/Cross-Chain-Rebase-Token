@@ -8,7 +8,7 @@ import {IRebaseToken} from "./interfaces/IRebaseToken.sol";
 
 contract RebaseTokenPool is TokenPool {
     constructor(IERC20 _token, address[] memory _allowlist, address _rmnProxy, address _router)
-        TokenPool(_token, _allowlist, _rmnProxy, _router)
+        TokenPool(_token, 18, _allowlist, _rmnProxy, _router)
     {}
 
     //Function which burn the user's tokens on the source chain
