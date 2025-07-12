@@ -40,9 +40,9 @@ contract TokenAndPoolDeployer is Script {
 }
 
 contract VaultDeployer is Script {
-    function run(address _rebaseTokenAddress) public {
+    function run(address _rebaseTokenAddress) public returns (Vault vault) {
         vm.startBroadcast();
-        Vault vault = new Vault(IRebaseToken(_rebaseTokenAddress));
+        vault = new Vault(IRebaseToken(_rebaseTokenAddress));
         IRebaseToken(_rebaseTokenAddress).grantMintAndBurnRole(address(vault));
         vm.stopBroadcast();
     }
