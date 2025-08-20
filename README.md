@@ -4,6 +4,7 @@ This project extends Chainlink CCIP with rebasing token logic that can flow seam
 Below is a high-level view of the moving pieces:
 
 🔧 Architecture Overview
+
       ┌────────────────────────────┐
       │ Ethereum Sepolia           │
       │                            │
