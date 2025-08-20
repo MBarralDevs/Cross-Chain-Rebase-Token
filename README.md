@@ -1,66 +1,110 @@
-## Foundry
+🌉 Cross-Chain Rebase Token (Sepolia ↔ zkSync Sepolia)
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This project extends Chainlink CCIP with rebasing token logic that can flow seamlessly across chains.
+Below is a high-level view of the moving pieces:
 
-Foundry consists of:
+🔧 Architecture Overview
+      ┌────────────────────────────┐
+      │ Ethereum Sepolia           │
+      │                            │
+      │  [RebaseToken]             │
+      │       │                    │
+      │  [RebaseTokenPool]         │
+      │       │                    │
+      │   CCIP Router ─────────────┼─────▶ Chainlink Network
+      │                            │
+      └────────────────────────────┘
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+      ┌────────────────────────────┐
+      │ zkSync Sepolia             │
+      │                            │
+      │  [RebaseToken]             │
+      │       │                    │
+      │  [RebaseTokenPool]         │
+      │       │                    │
+      │   CCIP Router ◀────────────┼───── Chainlink Network
+      │                            │
+      └────────────────────────────┘
 
-## Documentation
 
-https://book.getfoundry.sh/
+RebaseToken → ERC20 with supply rebasing
 
-## Usage
+RebaseTokenPool → CCIP bridge adapter for mint/burn on cross-chain transfer
 
-### Build
+Vault → contracts that need mint/burn authority
 
-```shell
-$ forge build
-```
+Chainlink CCIP → ensures secure delivery of tokens & messages
 
-### Test
+⚙️ Deployment Workflow
+Step 1 — Deploy Token + Pool + Vault
 
-```shell
-$ forge test
-```
+On each chain:
 
-### Format
+forge script script/Deployer.s.sol:TokenAndPoolDeployer \
+  --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast
 
-```shell
-$ forge fmt
-```
+forge script script/Deployer.s.sol:VaultDeployer \
+  --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast \
+  --sig "run(address)" <rebaseTokenAddress>
 
-### Gas Snapshots
 
-```shell
-$ forge snapshot
-```
+Result:
 
-### Anvil
+RebaseToken
 
-```shell
-$ anvil
-```
+RebaseTokenPool
 
-### Deploy
+Vault (granted mint/burn role)
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+Step 2 — Configure Pools
 
-### Cast
+Connect Sepolia ↔ zkSync Sepolia pools with chain selectors:
 
-```shell
-$ cast <subcommand>
-```
+graph TD
+  A[Sepolia Pool] -- remotePool=zkSync --> B[zkSync Pool]
+  B -- remotePool=Sepolia --> A
 
-### Help
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Script command example (Sepolia → zkSync):
+
+forge script script/ConfigurePool.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast \
+  --sig "run(address,uint64,address,address,bool,uint128,uint128,bool,uint128,uint128)" \
+  <localPool> 6890753640027530172 <remotePool> <remoteToken> \
+  true 1000e18 100e18 true 1000e18 100e18
+
+
+Do the reverse on zkSync.
+
+Step 3 — Fund LINK
+
+Every CCIP transfer needs LINK as gas.
+
+Sepolia LINK Faucet
+
+zkSync Sepolia LINK Faucet
+
+Step 4 — Bridge Tokens
+ [User Wallet] ---approve---> [Sepolia Router]
+         │
+         └── ccipSend(amount, fee) ──────▶ [Chainlink CCIP] ──────▶ [zkSync Router]
+                                                        │
+                                                        ▼
+                                               [RebaseTokenPool]
+                                                        │
+                                               [Mint on zkSync]
+
+
+Example bridge script (100 RBT Sepolia → zkSync):
+
+forge script script/BridgeTokens.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast \
+  --sig "run(address,uint64,address,uint256,address,address)" \
+  <recipient> 6890753640027530172 <localToken> 100e18 <linkToken> <router>
+
+📌 Reference Addresses
+Chain	Router	LINK	Selector
+Sepolia	0xD0daae2231E9CB96b94C8512223533293C3693Bf	0x779877A7B0D9E8603169DdbD7836e478b4624789	16015286601757825753
+zkSync Sepolia	0x2a7a9bE27A97F6b63a1d9C425B474E9f7706a32A	0xFe9f969faf8a0f2C5D9F91A58c7a4C15a0B4F53f	6890753640027530172
+
+✅ After bridging, the recipient wallet on zkSync Sepolia receives 100 RBT with rebasing logic preserved.
